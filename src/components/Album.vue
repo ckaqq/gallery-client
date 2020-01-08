@@ -21,7 +21,6 @@
 <script>
 import 'vue-awesome/icons/lock'
 import Icon from 'vue-awesome/components/Icon'
-import answerUtil from '@/utils/answer'
 
 export default {
   components: {
@@ -76,16 +75,7 @@ export default {
     },
 
     enter () {
-      if (!this.isLocked) {
-        this.navigate(this.album.path)
-        return
-      }
-
-      answerUtil(this.album.questions, this.checkAnswer).then((result) => {
-        if (result.value) {
-          this.navigate(this.album.path)
-        }
-      })
+      this.navigate(this.album.path)
     }
   }
 }

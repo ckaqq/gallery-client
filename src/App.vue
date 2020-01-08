@@ -2,7 +2,7 @@
   <div class="app">
     <navbar :path="path" :description="description"></navbar>
     <div class="content">
-      <div class="loading" v-if="loading">
+      <div class="loading" v-if="isLoading">
         <div class="spinner">
           <div class="double-bounce1"></div>
           <div class="double-bounce2"></div>
@@ -25,10 +25,9 @@
 import Navbar from '@/components/Navbar'
 import Gallery from '@/components/Gallery'
 import PhotoSwipe from '@/components/PhotoSwipe'
-import albumGql from '@/graphql/album'
-import answerGql from '@/graphql/answer'
-import serverGql from '@/graphql/server'
 import answerUtil from '@/utils/answer'
+import config from '@/utils/config'
+import getUpyunClient from '@/utils/upyun'
 
 export default {
   components: {
@@ -41,38 +40,20 @@ export default {
     return {
       error: null,
       gallery: null,
-      server: null
+      upyunClient: null,
+      loading: false
     }
   },
 
-  apollo: {
-    server: {
-      query: serverGql
-    },
-
-    gallery: {
-      query: albumGql,
-      variables () {
-        return {
-          path: this.path
-        }
-      },
-      update (data, b, c) {
-        if (data.gallery === this.gallery) {
-          return data.gallery
-        }
-
-        this.error = null
-        let { questions, albums, images } = data.gallery || {}
-        if (questions && questions.length) {
-          this.askQuestion(questions)
-        } else if (!albums.length && !images.length) {
-          this.error = '相册中还没有内容呢'
-        }
-        return data.gallery
-      },
-      fetchPolicy: 'network-only'
+  async mounted () {
+    const password = localStorage.getItem(config.passwordKey)
+    if (password) {
+      const result = await this.checkAnswer(password)
+      if (result) {
+        return this.getGallery()
+      }
     }
+    this.askQuestion()
   },
 
   computed: {
@@ -84,52 +65,57 @@ export default {
       return this.gallery ? this.gallery.description : null
     },
 
-    loading () {
-      return this.$apollo.queries.gallery.loading
+    isLoading () {
+      return this.loading
     },
 
     title () {
-      if (!this.server) {
-        return null
-      } else if (!this.gallery || this.gallery.name === '/') {
-        return this.server.title
+      if (!this.gallery || this.gallery.name === '/') {
+        return config.title
       } else {
-        return this.gallery.name + ' - ' + this.server.title
+        return this.gallery.name + ' - ' + config.title
       }
     }
   },
 
   methods: {
-    checkAnswer (path, answer) {
-      return this.$apollo.mutate({
-        mutation: answerGql,
-        variables: {
-          answers: [{
-            path,
-            answer
-          }]
-        }
-      }).then(({ data: { answer: { allowed } } }) => {
-        return allowed.indexOf(path) !== -1
+    checkAnswer (password) {
+      const client = getUpyunClient(password)
+      return client.usage('/').then(() => {
+        this.upyunClient = client
+        localStorage.setItem(config.passwordKey, password)
+        return true
+      }).catch(() => {
+        localStorage.removeItem(config.passwordKey)
+        return false
       })
     },
 
-    askQuestion (questions) {
-      answerUtil(questions, this.checkAnswer).then((result) => {
+    askQuestion () {
+      answerUtil(this.checkAnswer).then((result) => {
         if (!result.value) {
           this.error = '需要正确回答问题后才能访问！'
           return null
         }
-
-        this.$apollo.queries.gallery.fetchMore({
-          updateQuery: (previousResult, { fetchMoreResult }) => {
-            return fetchMoreResult
-          }
-        })
+        return this.getGallery()
       })
+    },
+
+    async getGallery () {
+      this.loading = true
+      this.error = null
+      const path = this.$route.query.path || '/'
+      this.gallery = await this.upyunClient.getAlbumAsync(path)
+      if (!this.gallery.albums.length && !this.gallery.images.length) {
+        this.error = '相册中还没有内容呢'
+      }
+      this.loading = false
     }
   },
   watch: {
+    '$route' () {
+      return this.getGallery()
+    },
     title (title) {
       document.title = title
     }
