@@ -19,7 +19,7 @@ class Upyun extends upyun.Client {
     const { makeThumbnail } = config.upyun
     const files = await this.listDirAsync(path)
     const gallery = getAlbumInfo(path)
-    await Promise.map(files, async (file) => {
+    await Promise.map(files, async (file, index) => {
       const filePath = pathJoin(path, file.name)
       if (file.type === 'F') {
         const album = getAlbumInfo(filePath)
@@ -30,6 +30,7 @@ class Upyun extends upyun.Client {
           return
         }
         gallery.images.push({
+          index: index,
           path: pathJoin(path, file.name),
           name: getNameFromPath(filePath),
           meta: await this.getMetaAsync(filePath),
@@ -40,7 +41,7 @@ class Upyun extends upyun.Client {
         })
       }
     }, { concurrency: 5 })
-    gallery.images.sort((a, b) => a.name > b.name)
+    gallery.images.sort((a, b) => a.index - b.index)
     return gallery
   }
 
@@ -77,9 +78,9 @@ class Upyun extends upyun.Client {
   async getThumbnailsAsync (path) {
     const { makeThumbnail } = config.upyun
 
-    const data = await this.getFile(pathJoin(path, '.thumbnails.json'))
-    if (data) {
-      return data.map((item) => this.getFileUrl(pathJoin(path, item, makeThumbnail)))
+    const name = getNameFromPath(path)
+    if (config.thumbnails[name]) {
+      return config.thumbnails[name].map((item) => this.getFileUrl(pathJoin(path, item, makeThumbnail)))
     }
 
     const result = []

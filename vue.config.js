@@ -1,14 +1,15 @@
+const { InjectManifest } = require('workbox-webpack-plugin')
+
 module.exports = {
   assetsDir: 'static',
-  devServer: {
-    allowedHosts: [
-      'develop.lc',
-      'localhost'
-    ],
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8000'
-      }
-    }
+  configureWebpack (config) {
+    config.plugins.push(
+      new InjectManifest({
+        swSrc: './src/utils/service-worker.js',
+        importsDirectory: 'static/js',
+        importWorkboxFrom: 'disabled', // 不使用谷歌workerbox的cdn
+        exclude: [/\.map$/, /^manifest.*\.js$/, /\.html$/]
+      })
+    )
   }
 }

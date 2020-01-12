@@ -8,5 +8,11 @@ export default {
     operator: 'demo',
     makeThumbnail: '!/fh/300',
     baseUrl: 'http://gallerys-demo.test.upcdn.net'
+  },
+
+  thumbnails: {
+    江南小镇: [
+      '百间楼.jpg'
+    ]
   }
 }
